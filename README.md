@@ -36,20 +36,18 @@ REST API for Vendora — a multi-seller e-commerce platform where sellers can cr
 
 ```
 src/
-├── modules/
-│   ├── auth/
-│   ├── users/
-│   ├── stores/
-│   ├── products/
-│   ├── categories/
-│   ├── orders/
-│   ├── cart/
-│   ├── payments/
-│   ├── subscriptions/
-│   └── admin/
 ├── middlewares/
+│   ├── errorHandler.ts
+│   └── notFound.ts
 ├── routes/
+│   └── index.ts
 ├── lib/
+│   ├── prisma.ts
+│   ├── env.ts
+│   └── logger.ts
+├── types/
+│   └── express.d.ts
+├── server.ts
 └── index.ts
 ```
 
