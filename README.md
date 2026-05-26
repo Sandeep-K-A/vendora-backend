@@ -4,6 +4,16 @@ REST API for Vendora — a multi-seller e-commerce platform where sellers can cr
 
 ---
 
+## Status
+
+| Symbol | Meaning |
+|---|---|
+| ✅ | Complete |
+| 🚧 | In Progress |
+| 📋 | Planned |
+
+---
+
 ## Tech Stack
 
 - **Runtime** — Node.js
@@ -21,14 +31,16 @@ REST API for Vendora — a multi-seller e-commerce platform where sellers can cr
 
 ## Features
 
-- Role-based authentication — Buyer, Seller, Admin
-- Seller store and product management
-- AI-powered semantic search with pgvector
-- AI description and SEO title generator for sellers
-- Cart and checkout with Stripe
-- Commission tracking per order
-- Seller AI subscription with Stripe billing
-- Admin dashboard and store management
+| Feature | Status |
+|---|---|
+| Role-based authentication — Buyer, Seller, Admin | 📋 Planned |
+| Seller store and product management | 📋 Planned |
+| AI-powered semantic search with pgvector | 📋 Planned |
+| AI description and SEO title generator for sellers | 📋 Planned |
+| Cart and checkout with Stripe | 📋 Planned |
+| Commission tracking per order | 📋 Planned |
+| Seller AI subscription with Stripe billing | 📋 Planned |
+| Admin dashboard and store management | 📋 Planned |
 
 ---
 
@@ -45,8 +57,6 @@ src/
 │   ├── prisma.ts
 │   ├── env.ts
 │   └── logger.ts
-├── types/
-│   └── express.d.ts
 ├── server.ts
 └── index.ts
 ```
@@ -91,44 +101,84 @@ npm run dev
 
 See `.env.example` for all required variables.
 
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `NODE_ENV` | `development` or `production` |
-| `PORT` | Server port (default 3000) |
-| `JWT_SECRET` | Secret key for JWT signing |
-| `JWT_EXPIRES_IN` | JWT expiry duration |
-| `CLIENT_URL` | Frontend URL for CORS |
+| Variable | Description | Status |
+|---|---|---|
+| `DATABASE_URL` | PostgreSQL connection string | ✅ |
+| `NODE_ENV` | `development` or `production` | ✅ |
+| `PORT` | Server port (default 3000) | ✅ |
+| `JWT_SECRET` | Secret key for JWT signing | 📋 Planned |
+| `JWT_EXPIRES_IN` | JWT expiry duration | 📋 Planned |
+| `CLIENT_URL` | Frontend URL for CORS | ✅ |
+| `STRIPE_SECRET_KEY` | Stripe secret key | 📋 Planned |
+| `OPENAI_API_KEY` | OpenAI API key | 📋 Planned |
 
 ---
 
 ## API Endpoints
 
+Full API documentation will be updated as features are completed.
+
 ### Auth
-| Method | Endpoint | Description | Access |
+| Method | Endpoint | Description | Status |
 |---|---|---|---|
-| POST | `/api/v1/auth/register` | Register new user | Public |
-| POST | `/api/v1/auth/login` | Login | Public |
-| GET | `/api/v1/auth/me` | Get current user | Private |
+| POST | `/api/v1/auth/register` | Register new user | 📋 Planned |
+| POST | `/api/v1/auth/login` | Login | 📋 Planned |
+| GET | `/api/v1/auth/me` | Get current user | 📋 Planned |
 
 ### Stores
-| Method | Endpoint | Description | Access |
+| Method | Endpoint | Description | Status |
 |---|---|---|---|
-| POST | `/api/v1/stores` | Create store | Seller |
-| GET | `/api/v1/stores` | Get all stores | Public |
-| GET | `/api/v1/stores/:slug` | Get store by slug | Public |
-| PATCH | `/api/v1/stores/:slug` | Update store | Seller |
+| POST | `/api/v1/stores` | Create store | 📋 Planned |
+| GET | `/api/v1/stores` | Get all stores | 📋 Planned |
+| GET | `/api/v1/stores/:slug` | Get store by slug | 📋 Planned |
+| PATCH | `/api/v1/stores/:slug` | Update store | 📋 Planned |
 
 ### Products
-| Method | Endpoint | Description | Access |
+| Method | Endpoint | Description | Status |
 |---|---|---|---|
-| POST | `/api/v1/products` | Create product | Seller |
-| GET | `/api/v1/products` | Get all products | Public |
-| GET | `/api/v1/products/:id` | Get product | Public |
-| PATCH | `/api/v1/products/:id` | Update product | Seller |
-| DELETE | `/api/v1/products/:id` | Delete product | Seller |
+| POST | `/api/v1/products` | Create product | 📋 Planned |
+| GET | `/api/v1/products` | Get all products | 📋 Planned |
+| GET | `/api/v1/products/:id` | Get product | 📋 Planned |
+| PATCH | `/api/v1/products/:id` | Update product | 📋 Planned |
+| DELETE | `/api/v1/products/:id` | Delete product | 📋 Planned |
 
-> Full API documentation coming soon.
+### Cart
+| Method | Endpoint | Description | Status |
+|---|---|---|---|
+| GET | `/api/v1/cart` | Get cart | 📋 Planned |
+| POST | `/api/v1/cart` | Add item to cart | 📋 Planned |
+| PATCH | `/api/v1/cart/:itemId` | Update cart item | 📋 Planned |
+| DELETE | `/api/v1/cart/:itemId` | Remove cart item | 📋 Planned |
+
+### Orders
+| Method | Endpoint | Description | Status |
+|---|---|---|---|
+| POST | `/api/v1/orders` | Create order | 📋 Planned |
+| GET | `/api/v1/orders` | Get my orders | 📋 Planned |
+| GET | `/api/v1/orders/:id` | Get order by id | 📋 Planned |
+| PATCH | `/api/v1/orders/:id/status` | Update order status | 📋 Planned |
+
+### Payments
+| Method | Endpoint | Description | Status |
+|---|---|---|---|
+| POST | `/api/v1/payments/checkout` | Create Stripe checkout session | 📋 Planned |
+| POST | `/api/v1/payments/webhook` | Stripe webhook handler | 📋 Planned |
+
+### AI
+| Method | Endpoint | Description | Status |
+|---|---|---|---|
+| POST | `/api/v1/ai/description` | Generate product description | 📋 Planned |
+| POST | `/api/v1/ai/title` | Generate SEO title | 📋 Planned |
+| GET | `/api/v1/ai/search` | Semantic product search | 📋 Planned |
+| GET | `/api/v1/ai/recommendations` | Product recommendations | 📋 Planned |
+
+### Admin
+| Method | Endpoint | Description | Status |
+|---|---|---|---|
+| GET | `/api/v1/admin/users` | Get all users | 📋 Planned |
+| GET | `/api/v1/admin/stores` | Get all stores | 📋 Planned |
+| PATCH | `/api/v1/admin/stores/:id` | Approve or suspend store | 📋 Planned |
+| GET | `/api/v1/admin/commissions` | Get commission report | 📋 Planned |
 
 ---
 
