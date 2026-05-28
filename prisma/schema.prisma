@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  BUYER
+  SELLER
+  ADMIN
+}
+
 model User {
   id            String         @id @default(cuid())
   email         String         @unique
@@ -21,12 +27,6 @@ model User {
   refreshTokens RefreshToken[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-}
-
-enum Role {
-  BUYER
-  SELLER
-  ADMIN
 }
 
 model RefreshToken {
