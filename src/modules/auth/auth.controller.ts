@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { loginSchema, registerSchema } from "./auth.schema";
-import { login, register } from "./auth.service";
-import { success } from "zod";
+import { login, refresh, register } from "./auth.service";
+import { AppError } from "../../middlewares/errorHandler";
 
 function setRefreshTokenCookie(res: Response, token: string) {
   res.cookie("refreshToken", token, {
@@ -16,7 +16,7 @@ export async function registerController(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
     const data = registerSchema.parse(req.body);
     const result = await register(data);
@@ -41,7 +41,7 @@ export async function loginController(
   req: Request,
   res: Response,
   next: NextFunction,
-) {
+): Promise<void> {
   try {
     const data = loginSchema.parse(req.body);
     const result = await login(data);
@@ -54,6 +54,32 @@ export async function loginController(
       message: "Login successful",
       data: {
         user: result.user,
+        accessToken: result.accessToken,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function refreshController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const token = req.cookies.refreshToken as string | undefined;
+
+    if (!token) {
+      throw new AppError("Refresh token missing", 401);
+    }
+
+    const result = await refresh(token);
+
+    res.status(200).json({
+      success: true,
+      message: "Token refreshed successfully",
+      data: {
         accessToken: result.accessToken,
       },
     });
