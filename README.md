@@ -120,11 +120,13 @@ Full API documentation will be updated as features are completed.
 
 ### Auth
 
-| Method | Endpoint                | Description       | Status       |
-| ------ | ----------------------- | ----------------- | ------------ |
-| POST   | `/api/v1/auth/register` | Register new user | ✅ Completed |
-| POST   | `/api/v1/auth/login`    | Login             | ✅ Completed |
-| GET    | `/api/v1/auth/me`       | Get current user  | 📋 Planned   |
+| Method | Endpoint                | Description          | Status         |
+| ------ | ----------------------- | -------------------- | -------------- |
+| POST   | `/api/v1/auth/register` | Register new user    | ✅ Completed   |
+| POST   | `/api/v1/auth/login`    | Login                | ✅ Completed   |
+| POST   | `/api/v1/auth/refresh`  | Refresh access token | 🚧 In Progress |
+| POST   | `/api/v1/auth/logout`   | Logout               | 📋 Planned     |
+| GET    | `/api/v1/auth/me`       | Get current user     | 📋 Planned     |
 
 ### Stores
 
