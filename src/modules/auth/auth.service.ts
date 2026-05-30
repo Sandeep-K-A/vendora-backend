@@ -4,7 +4,7 @@ import type { Role, User } from "@prisma/client";
 import { env } from "../../lib/env";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../middlewares/errorHandler";
-import { RegisterInput } from "./auth.schema";
+import { RegisterInput, LoginInput } from "./auth.schema";
 
 type AuthResponse = {
   user: Omit<User, "password">;
@@ -22,6 +22,32 @@ function generateRefreshToken(userId: string): string {
   return jwt.sign({ userId }, env.REFRESH_TOKEN_SECRET, {
     expiresIn: env.REFRESH_TOKEN_EXPIRES_IN as jwt.SignOptions["expiresIn"],
   });
+}
+
+async function generateAuthTokens(user: User): Promise<AuthResponse> {
+  //1.Generate tokens
+  const accessToken = generateAccessToken(user.id, user.role);
+  const refreshToken = generateRefreshToken(user.id);
+
+  //2.Store refresh token in database with expiry
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  await prisma.refreshToken.create({
+    data: {
+      token: refreshToken,
+      userId: user.id,
+      expiresAt,
+    },
+  });
+
+  //3.Return user without password + tokens
+  const { password: _, ...userWithoutPassword } = user;
+
+  return {
+    user: userWithoutPassword,
+    accessToken,
+    refreshToken,
+  };
 }
 
 export async function register(data: RegisterInput): Promise<AuthResponse> {
@@ -57,28 +83,23 @@ export async function register(data: RegisterInput): Promise<AuthResponse> {
     }
     return newUser;
   });
+  return generateAuthTokens(user);
+}
 
-  //5.Generate tokens
-  const accessToken = generateAccessToken(user.id, user.role);
-  const refreshToken = generateRefreshToken(user.id);
-
-  //6.Store refresh token in database with expiry
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-  await prisma.refreshToken.create({
-    data: {
-      token: refreshToken,
-      userId: user.id,
-      expiresAt,
-    },
+export async function login(data: LoginInput): Promise<AuthResponse> {
+  //1.Find user by email
+  const user = await prisma.user.findUnique({
+    where: { email: data.email },
   });
 
-  //7.Return user without password + tokens
-  const { password: _, ...userWithoutPassword } = user;
+  //2.Check user exist and password is correct
+  const isPasswordValid = user
+    ? await bcrypt.compare(data.password, user.password)
+    : false;
 
-  return {
-    user: userWithoutPassword,
-    accessToken,
-    refreshToken,
-  };
+  if (!user || !isPasswordValid) {
+    throw new AppError("Invalid credentials", 401);
+  }
+
+  return generateAuthTokens(user);
 }

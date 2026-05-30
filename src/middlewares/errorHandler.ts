@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger";
-import z, { ZodError } from "zod";
+import { ZodError } from "zod";
 
 export class AppError extends Error {
   constructor(
@@ -21,10 +21,24 @@ export function errorHandler(
   //Zod validation error
 
   if (err instanceof ZodError) {
+    const formattedErrors = err.issues.reduce(
+      (acc, issue) => {
+        const field = issue.path.join(".");
+        if (issue.code === "invalid_type") {
+          acc[field] =
+            `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
+        } else {
+          acc[field] = issue.message;
+        }
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+
     res.status(400).json({
       success: false,
       message: "Validation error",
-      errors: z.treeifyError(err),
+      errors: formattedErrors,
     });
     return;
   }

@@ -106,8 +106,8 @@ See `.env.example` for all required variables.
 | `DATABASE_URL`      | PostgreSQL connection string  | ✅         |
 | `NODE_ENV`          | `development` or `production` | ✅         |
 | `PORT`              | Server port (default 3000)    | ✅         |
-| `JWT_SECRET`        | Secret key for JWT signing    | 📋 Planned |
-| `JWT_EXPIRES_IN`    | JWT expiry duration           | 📋 Planned |
+| `JWT_SECRET`        | Secret key for JWT signing    | ✅         |
+| `JWT_EXPIRES_IN`    | JWT expiry duration           | ✅         |
 | `CLIENT_URL`        | Frontend URL for CORS         | ✅         |
 | `STRIPE_SECRET_KEY` | Stripe secret key             | 📋 Planned |
 | `OPENAI_API_KEY`    | OpenAI API key                | 📋 Planned |
@@ -120,11 +120,11 @@ Full API documentation will be updated as features are completed.
 
 ### Auth
 
-| Method | Endpoint                | Description       | Status     |
-| ------ | ----------------------- | ----------------- | ---------- |
-| POST   | `/api/v1/auth/register` | Register new user | 📋 Planned |
-| POST   | `/api/v1/auth/login`    | Login             | 📋 Planned |
-| GET    | `/api/v1/auth/me`       | Get current user  | 📋 Planned |
+| Method | Endpoint                | Description       | Status       |
+| ------ | ----------------------- | ----------------- | ------------ |
+| POST   | `/api/v1/auth/register` | Register new user | ✅ Completed |
+| POST   | `/api/v1/auth/login`    | Login             | ✅ Completed |
+| GET    | `/api/v1/auth/me`       | Get current user  | 📋 Planned   |
 
 ### Stores
 
