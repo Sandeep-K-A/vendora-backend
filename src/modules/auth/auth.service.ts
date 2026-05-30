@@ -138,3 +138,7 @@ export async function refresh(token: string): Promise<{ accessToken: string }> {
 
   return { accessToken };
 }
+
+export async function logout(token: string): Promise<void> {
+  await prisma.refreshToken.delete({ where: { token } }).catch(() => null);
+}

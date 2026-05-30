@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { loginSchema, registerSchema } from "./auth.schema";
-import { login, refresh, register } from "./auth.service";
+import { login, logout, refresh, register } from "./auth.service";
 import { AppError } from "../../middlewares/errorHandler";
 
 function setRefreshTokenCookie(res: Response, token: string) {
@@ -82,6 +82,33 @@ export async function refreshController(
       data: {
         accessToken: result.accessToken,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function logoutController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const token = req.cookies.refreshToken as string | undefined;
+
+    if (token) {
+      await logout(token);
+    }
+
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
     });
   } catch (error) {
     next(error);
