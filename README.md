@@ -125,8 +125,8 @@ Full API documentation will be updated as features are completed.
 | POST   | `/api/v1/auth/register` | Register new user    | ✅ Completed   |
 | POST   | `/api/v1/auth/login`    | Login                | ✅ Completed   |
 | POST   | `/api/v1/auth/refresh`  | Refresh access token | ✅ Completed   |
-| POST   | `/api/v1/auth/logout`   | Logout               | 🚧 In Progress |
-| GET    | `/api/v1/auth/me`       | Get current user     | 📋 Planned     |
+| POST   | `/api/v1/auth/logout`   | Logout               | ✅ Completed   |
+| GET    | `/api/v1/auth/me`       | Get current user     | 🚧 In Progress |
 
 ### Stores
 
