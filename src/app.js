@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 const pinoHttp = require("pino-http");
 const logger = require("./utils/logger");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
+const authRoutes = require("./routes/auth.routes");
 
 const app = express();
 
@@ -25,7 +26,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // --- Routes will be mounted here as we build them ---
-// app.use('/api/auth', require('./routes/auth.routes'));
+app.use("/api/auth", authRoutes);
 
 // --- 404 handler ---
 app.use(notFound);
