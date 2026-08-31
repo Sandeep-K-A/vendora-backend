@@ -1,20 +1,22 @@
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const User = require("../models/User");
 const RefreshToken = require("../models/RefreshToken");
-const Vendor = require("../models/Vendor");
 const ApiError = require("../utils/ApiError");
 const { generateOtp, verifyRefreshToken } = require("../utils/jwt");
 const { issueTokens } = require("../utils/session");
-const { sendOtpEmail } = require("../services/email.service");
+const {
+  sendOtpEmail,
+  sendPasswordResetEmail,
+} = require("../services/email.service");
 
 /*
  *POST /api/auth/register
- *Creates a new (unverified) User, and a skeleton Vendor doc if
- *role === 'vendor'. Sends an OTP for email verification.
+ *Creates a new (unverified) User
  */
 
 const registerUser = async (req, res, next) => {
-  const { fullname, email, password, role } = req.body;
+  const { fullname, email, password } = req.body;
 
   const existingVerifiedUser = await User.findOne({ email, isVerified: true });
   if (existingVerifiedUser) {
@@ -26,11 +28,7 @@ const registerUser = async (req, res, next) => {
   // reject this new attempt even though the old one isn't "real" yet.
   await User.deleteOne({ email, isVerified: false });
 
-  const user = await User.create({ fullname, email, password, role });
-
-  if (role === "vendor") {
-    await Vendor.create({ userId: user._id });
-  }
+  const user = await User.create({ fullname, email, password });
 
   const otp = generateOtp();
   await user.setOtp(otp);
@@ -89,9 +87,9 @@ const verifyOtp = async (req, res, next) => {
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production", // only over HTTPS in production
+    secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // matches JWT_REFRESH_EXPIRES_IN default
+    maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
   res.status(200).json({
@@ -104,8 +102,56 @@ const verifyOtp = async (req, res, next) => {
         fullname: user.fullname,
         email: user.email,
         role: user.role,
+        isVendor: user.isVendor,
+        storeId: user.storeId,
       },
     },
+  });
+};
+
+const resendOtp = async (req, res, next) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email }).select("+otpExpiresAt");
+
+  if (!user) {
+    throw new ApiError(400, "No pending registration found for this email");
+  }
+
+  if (user.isVerified) {
+    throw new ApiError(400, "This account is already verified");
+  }
+
+  const otpAgeMs = user.otpExpiresAt
+    ? 10 * 60 * 1000 - (user.otpExpiresAt.getTime() - Date.now())
+    : Infinity;
+
+  if (otpAgeMs < 60 * 1000) {
+    throw new ApiError(
+      429,
+      "Please wait a moment before requesting another code",
+    );
+  }
+
+  const otp = generateOtp();
+  await user.setOtp(otp);
+  await user.save();
+
+  try {
+    await sendOtpEmail(user.email, otp);
+  } catch (err) {
+    return res.status(200).json({
+      success: true,
+      message:
+        "We generated a new code, but could not send the verification email. Please try again",
+      data: { email: user.email, emailSent: false },
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "A new verification code has been sent to your email.",
+    data: { email: user.email, emailSent: true },
   });
 };
 
@@ -127,7 +173,9 @@ const login = async (req, res, next) => {
   // This person already knows this email is
   // theirs and registered; telling them "verify first"
   if (!user.isVerified) {
-    throw new ApiError(403, "Please verify your email before logging in");
+    throw new ApiError(403, "Please verify your account to continue", {
+      email: user.email,
+    });
   }
 
   const { accessToken, refreshToken } = await issueTokens(user, req);
@@ -149,6 +197,8 @@ const login = async (req, res, next) => {
         fullname: user.fullname,
         email: user.email,
         role: user.role,
+        isVendor: user.isVendor,
+        storeId: user.storeId,
       },
     },
   });
@@ -225,7 +275,17 @@ const refresh = async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: "Token refreshed",
-    data: { accessToken },
+    data: {
+      accessToken,
+      user: {
+        id: user._id,
+        fullname: user.fullname,
+        email: user.email,
+        role: user.role,
+        isVendor: user.isVendor,
+        storeId: user.storeId,
+      },
+    },
   });
 };
 
@@ -269,4 +329,118 @@ const logout = async (req, res, next) => {
   });
   res.status(200).json({ success: true, message: "Logged out successfully" });
 };
-module.exports = { registerUser, verifyOtp, login, refresh, logout };
+
+const forgotPassword = async (req, res, next) => {
+  const { email } = req.body;
+
+  const genericResponse = {
+    success: true,
+    message:
+      "If an account exists with that email, we've sent a password reset link.",
+  };
+
+  const user = await User.findOne({ email }).select("+resetPasswordExpiresAt");
+
+  if (!user) {
+    return res.status(200).json(genericResponse);
+  }
+
+  const tokenAgeMs = user.resetPasswordExpiresAt
+    ? 30 * 60 * 1000 - (user.resetPasswordExpiresAt.getTime() - Date.now())
+    : Infinity;
+
+  if (tokenAgeMs < 60 * 1000) {
+    return res.status(200).json(genericResponse);
+  }
+
+  const plainToken = user.setResetPasswordToken();
+  await user.save();
+
+  try {
+    await sendPasswordResetEmail(user.email, plainToken);
+  } catch (err) {
+    console.error("Failed to send password reset email:", err);
+  }
+
+  res.status(200).json(genericResponse);
+};
+
+/*
+ * POST /api/auth/reset-password
+ * Verifies the reset token, updates the password, invalidates the
+ * token (single-use), and revokes ALL existing sessions for this user
+ * — critical in case the account was compromised.
+ */
+const resetPassword = async (req, res, next) => {
+  console.log(req.body, "............");
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    throw new ApiError(400, "Token and new password are required");
+  }
+
+  const candidateHash = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await User.findOne({
+    resetPasswordTokenHash: candidateHash,
+  }).select("+resetPasswordTokenHash +resetPasswordExpiresAt +password");
+
+  if (!user || !user.verifyResetPasswordToken(token)) {
+    throw new ApiError(400, "Invalid or expired reset link");
+  }
+
+  user.password = newPassword; // pre("save") hook re-hashes this automatically
+  user.clearResetPasswordToken();
+  await user.save();
+
+  // Revoke all existing sessions — if the account was compromised, this
+  // kicks out any attacker's active session too, not just this device.
+  await RefreshToken.deleteMany({ userId: user._id });
+
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+
+  res.status(200).json({
+    success: true,
+    message:
+      "Password reset successfully. Please log in with your new password.",
+  });
+};
+
+/*
+ * GET /api/auth/me
+ * Returns the currently authenticated user's data. Requires the
+ * `protect` middleware to have already run and populated req.user
+ * with a fresh document from the DB.
+ */
+const getMe = async (req, res, next) => {
+  res.status(200).json({
+    success: true,
+    message: "User fetched successfully",
+    data: {
+      user: {
+        id: req.user._id,
+        fullname: req.user.fullname,
+        email: req.user.email,
+        role: req.user.role,
+        isVendor: req.user.isVendor,
+        storeId: req.user.storeId,
+      },
+    },
+  });
+};
+
+module.exports = {
+  registerUser,
+  verifyOtp,
+  resendOtp,
+  login,
+  forgotPassword,
+  resetPassword,
+  refresh,
+  logout,
+  getMe,
+};

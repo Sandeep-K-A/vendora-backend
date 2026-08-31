@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const userSchema = new mongoose.Schema(
   {
@@ -18,15 +19,9 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, "Email is required"],
-      unique: true, // creates a unique index — also what makes duplicate
-      // registrations surface as a Mongo 11000 error, which
-      // our error handler already normalizes to a 409
+      unique: true,
       lowercase: true,
       trim: true,
-      // Standard pragmatic email pattern: local-part@domain.tld — not
-      // trying to fully implement RFC 5322 (that regex is genuinely
-      // enormous and still imperfect); this catches the real-world
-      // malformed-input case without being a research project.
       match: [
         /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
         "Please enter a valid email address",
@@ -36,14 +31,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Password is required"],
       minlength: [8, "Password must be at least 8 characters"],
-      select: false, // never returned by default — must opt in with
-      // .select('+password') in the login controller
-      // At least one lowercase, one uppercase, one digit, one special
-      // character. Uses a `validate` function (not `match`) gated on
-      // isModified/isNew — a plain `match` would re-run against the
-      // bcrypt HASH on every later save() (e.g. updating fullname),
-      // since by then this.password is no longer plaintext, and the
-      // hash would never match the pattern, breaking unrelated updates.
+      select: false,
       validate: {
         validator: function (value) {
           if (!this.isModified("password")) return true; // skip re-check on hash
@@ -57,10 +45,17 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["user", "vendor", "admin"],
-      default: "user", // server-side default — never trust the client's
-      // role field blindly, even though the frontend
-      // form pre-selects one
+      enum: ["user", "admin"],
+      default: "user",
+    },
+    isVendor: {
+      type: Boolean,
+      default: false,
+    },
+    storeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      // ref: Store,
+      default: null,
     },
 
     // --- Email verification (OTP) ---
@@ -70,9 +65,17 @@ const userSchema = new mongoose.Schema(
     },
     otpHash: {
       type: String,
-      select: false, // same reasoning as password — never leak by default
+      select: false,
     },
     otpExpiresAt: {
+      type: Date,
+      select: false,
+    },
+    resetPasswordTokenHash: {
+      type: String,
+      select: false,
+    },
+    resetPasswordExpiresAt: {
       type: Date,
       select: false,
     },
@@ -92,10 +95,6 @@ userSchema.index(
   },
 );
 
-// --- Hash password before saving, but only if it was actually modified ---
-// The isModified check matters: without it, every save() (even one that
-// only updates, say, fullname) would re-hash an already-hashed password,
-// silently breaking login.
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;
 
@@ -124,4 +123,42 @@ userSchema.methods.verifyOtp = async function (candidateOtp) {
   return bcrypt.compare(candidateOtp, this.otpHash);
 };
 
+// --- Instance method: generate and store a password reset token --
+userSchema.methods.setResetPasswordToken = function (expiresInMinutes = 30) {
+  const plainToken = crypto.randomBytes(32).toString("Hex");
+  this.resetPasswordTokenHash = crypto
+    .createHash("sha256")
+    .update(plainToken)
+    .digest("hex");
+  this.resetPasswordExpiresAt = new Date(
+    Date.now() + expiresInMinutes * 60 * 1000,
+  );
+
+  return plainToken;
+};
+
+// --- Instance method: verify a submitted reset token against the stored hash ---
+userSchema.methods.verifyResetPasswordToken = function (candidateToken) {
+  if (!this.resetPasswordTokenHash || !this.resetPasswordExpiresAt) {
+    return false;
+  }
+  if (this.resetPasswordExpiresAt < new Date()) return false; // expired
+
+  const candidateHash = crypto
+    .createHash("sha256")
+    .update(candidateToken)
+    .digest("hex");
+  const storedBuffer = Buffer.from(this.resetPasswordTokenHash, "hex");
+  const candidateBuffer = Buffer.from(candidateHash, "hex");
+
+  if (storedBuffer.length !== candidateBuffer.length) return false;
+
+  return crypto.timingSafeEqual(storedBuffer, candidateBuffer);
+};
+
+// --- Instance method: clear the reset token (after use, or on request) ---
+userSchema.methods.clearResetPasswordToken = function () {
+  this.resetPasswordTokenHash = undefined;
+  this.resetPasswordExpiresAt = undefined;
+};
 module.exports = mongoose.model("User", userSchema);

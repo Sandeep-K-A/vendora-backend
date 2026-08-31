@@ -1,24 +1,31 @@
+const User = require("../models/User");
 const ApiError = require("../utils/ApiError");
 const { verifyAccessToken } = require("../utils/jwt");
 
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.starsWith("Bearer ")) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return next(new ApiError(401, "Not Authenticated - no token provided"));
   }
 
   const token = authHeader.split(" ")[1];
-
+  let decoded;
   try {
-    const decoded = verifyAccessToken(token);
-    req.user = decoded;
-    next();
+    decoded = verifyAccessToken(token);
   } catch (err) {
     return next(
-      new ApiError(401, "Not Authenticatd - invalid or expired token"),
+      new ApiError(401, "Not Authenticated - invalid or expired token"),
     );
   }
+
+  const user = await User.findById(decoded.userId);
+
+  if (!user) {
+    return next(new ApiError(401, "Not Authenticated - user no longer exist"));
+  }
+  req.user = user;
+  next();
 };
 
 const authorize = (...allowedRoles) => {

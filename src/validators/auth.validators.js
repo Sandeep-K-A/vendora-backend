@@ -28,7 +28,6 @@ const registerSchema = z.object({
   fullname: fullnameSchema,
   email: emailSchema,
   password: passwordSchema,
-  role: z.enum(["user", "vendor"]).default("user"),
 });
 
 const loginSchema = z.object({
