@@ -5,6 +5,8 @@ const pinoHttp = require("pino-http");
 const logger = require("./utils/logger");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
 const authRoutes = require("./routes/auth.routes");
+const categoryRoutes = require("./routes/category.routes");
+const storeRoutes = require("./routes/store.routes");
 
 const app = express();
 
@@ -27,6 +29,8 @@ app.get("/api/health", (req, res) => {
 
 // --- Routes will be mounted here as we build them ---
 app.use("/api/auth", authRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/store", storeRoutes);
 
 // --- 404 handler ---
 app.use(notFound);

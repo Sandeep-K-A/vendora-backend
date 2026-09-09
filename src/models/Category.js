@@ -1,5 +1,11 @@
 const mongoose = require("mongoose");
 
+const specFieldSchema = new mongoose.Schema({
+  key: { type: String, required: true },
+  label: { type: String, required: true },
+  required: { type: Boolean, default: false },
+});
+
 const subcategorySchema = new mongoose.Schema({
   name: {
     type: String,
@@ -13,6 +19,7 @@ const subcategorySchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
   },
+  specFields: [specFieldSchema],
 });
 
 const categorySchema = new mongoose.Schema(

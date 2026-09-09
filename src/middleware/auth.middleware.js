@@ -41,4 +41,16 @@ const authorize = (...allowedRoles) => {
   };
 };
 
-module.exports = { protect, authorize };
+const requireVendor = (req, res, next) => {
+  if (!req.user) {
+    return next(new ApiError(401, "Not Authenticated - no user context"));
+  }
+  if (!req.user.isVendor) {
+    return next(
+      new ApiError(403, "Forbidden — you must create a store to access this"),
+    );
+  }
+  next();
+};
+
+module.exports = { protect, authorize, requireVendor };

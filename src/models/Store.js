@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
 
-const vendorSchema = new mongoose.Schema(
+const storeSchema = new mongoose.Schema(
   {
     owner: {
       type: mongoose.Schema.Types.ObjectId,
@@ -96,18 +96,13 @@ const vendorSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-storeSchema.pre("save", async function (next) {
-  // Only generate a slug on initial creation, or if name actually
-  // changed — not on every unrelated update (e.g. editing description).
-  if (!this.isModified("name")) return next();
+storeSchema.pre("validate", async function () {
+  if (!this.isModified("storeName")) return;
 
-  const baseSlug = slugify(this.name, { lower: true, strict: true });
+  const baseSlug = slugify(this.storeName, { lower: true, strict: true });
   let candidateSlug = baseSlug;
   let counter = 1;
 
-  // Exclude the current document from the uniqueness check (matters if
-  // this runs on an update where name changed, not just creation) —
-  // otherwise a store would collide with its own existing slug.
   while (
     await mongoose.models.Store.findOne({
       slug: candidateSlug,
@@ -119,7 +114,7 @@ storeSchema.pre("save", async function (next) {
   }
 
   this.slug = candidateSlug;
-  next();
+  // no next() call at all — returning naturally signals completion
 });
 
-module.exports = mongoose.model("Vendor", vendorSchema);
+module.exports = mongoose.model("Store", storeSchema);
