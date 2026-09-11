@@ -7,6 +7,7 @@ const { notFound, errorHandler } = require("./middleware/error.middleware");
 const authRoutes = require("./routes/auth.routes");
 const categoryRoutes = require("./routes/category.routes");
 const storeRoutes = require("./routes/store.routes");
+const productRoutes = require("./routes/product.routes");
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/store", storeRoutes);
+app.use("/api/products", productRoutes);
 
 // --- 404 handler ---
 app.use(notFound);

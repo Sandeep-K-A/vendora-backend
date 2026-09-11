@@ -2,7 +2,7 @@ const Product = require("../models/Product");
 const Category = require("../models/Category");
 const Store = require("../models/Store");
 const ApiError = require("../utils/ApiError");
-const uploadImageToCloudinary = require("../utils/uploadImage");
+const { uploadImageToCloudinary } = require("../utils/uploadImage");
 
 /*
  * POST /api/products
@@ -11,7 +11,7 @@ const uploadImageToCloudinary = require("../utils/uploadImage");
  * specFields template before saving.
  */
 const createProduct = async (req, res, next) => {
-  const { name, aboutThisProduct, categoryId, subCategoryId, price, stock } =
+  const { name, aboutThisProduct, categoryId, subcategoryId, price, stock } =
     req.body;
 
   let keyHighlights = [];
@@ -39,7 +39,8 @@ const createProduct = async (req, res, next) => {
     throw new ApiError(404, "Category not found");
   }
 
-  const subcategory = category.subcategories.id(subCategoryId);
+  const subcategory = category.subcategories.id(subcategoryId);
+
   if (!subcategory) {
     throw new ApiError(404, "Subcategory not found");
   }
@@ -136,7 +137,8 @@ const getMyProducts = async (req, res, next) => {
   const sortQuery = sortMap[sort] || sortMap.newest;
 
   const [products, totalCount] = await Promise.all([
-    (await Product.find(filter).populate("category", "name"))
+    Product.find(filter)
+      .populate("category", "name")
       .sort(sortQuery)
       .skip((page - 1) * limit)
       .limit(limit),
@@ -152,6 +154,29 @@ const getMyProducts = async (req, res, next) => {
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
     },
+  });
+};
+
+/*
+ * GET /api/products/:id
+ * Full detail for a single product — public-readable shape, but here
+ * scoped for the seller's own management view (ownership NOT enforced
+ * yet — add a check if this should be seller-only).
+ */
+const getProductById = async (req, res, next) => {
+  const product = await Product.findById(req.params.id).populate(
+    "category",
+    "name",
+  );
+
+  if (!product) {
+    throw new ApiError(404, "Product not found");
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Product fetched successfully",
+    data: { product },
   });
 };
 
