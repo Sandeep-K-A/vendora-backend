@@ -4,15 +4,25 @@ const cookieParser = require("cookie-parser");
 const pinoHttp = require("pino-http");
 const logger = require("./utils/logger");
 const { notFound, errorHandler } = require("./middleware/error.middleware");
+const { handleStripeWebhook } = require("./controllers/webhook.controller");
 const authRoutes = require("./routes/auth.routes");
 const categoryRoutes = require("./routes/category.routes");
 const storeRoutes = require("./routes/store.routes");
 const productRoutes = require("./routes/product.routes");
+const cartRoutes = require("./routes/cart.routes");
+const addressRoutes = require("./routes/address.routes");
+const checkoutRoutes = require("./routes/checkout.routes");
+const orderRoutes = require("./routes/order.routes");
 
 const app = express();
 
 // --- Core middleware ---
 app.use(pinoHttp({ logger }));
+app.post(
+  "/api/webhooks/stripe",
+  express.raw({ type: "application/json" }),
+  handleStripeWebhook,
+);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -33,6 +43,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/store", storeRoutes);
 app.use("/api/products", productRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/addresses", addressRoutes);
+app.use("/api/checkout", checkoutRoutes);
+app.use("/api/orders", orderRoutes);
 
 // --- 404 handler ---
 app.use(notFound);

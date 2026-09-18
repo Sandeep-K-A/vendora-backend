@@ -1,6 +1,7 @@
 const Product = require("../models/Product");
 const Category = require("../models/Category");
 const Store = require("../models/Store");
+const Order = require("../models/Order");
 const ApiError = require("../utils/ApiError");
 const { uploadImageToCloudinary } = require("../utils/uploadImage");
 
@@ -99,6 +100,111 @@ const createProduct = async (req, res, next) => {
 };
 
 /*
+ * GET /api/products
+ * Public product browsing with cursor-based pagination for infinite
+ * scroll. Cursor is the createdAt timestamp of the last product seen.
+ */
+const getProducts = async (req, res, next) => {
+  const limit = parseInt(req.query.limit) || 12;
+  const { categorySlug, subcategorySlug, sort, minPrice, maxPrice, cursor } =
+    req.query;
+
+  const activeStores = await Store.find({
+    verificationStatus: "active",
+  }).select("_id");
+  const activeStoreIds = activeStores.map((s) => s._id);
+
+  const filter = {
+    isActive: true,
+    store: { $in: activeStoreIds },
+  };
+
+  if (categorySlug) {
+    const category = await Category.findOne({
+      slug: categorySlug,
+      isActive: true,
+    });
+
+    if (!category) {
+      return res.status(200).json({
+        success: true,
+        message: "Products fetched successfully",
+        data: { products: [], nextCursor: null, hasMore: false },
+      });
+    }
+
+    filter.category = category._id;
+
+    if (subcategorySlug) {
+      const subcategory = category.subcategories.find(
+        (s) => s.slug === subcategorySlug,
+      );
+      if (subcategory) {
+        filter.subcategoryId = subcategory._id;
+      }
+    }
+  }
+
+  if (minPrice || maxPrice) {
+    filter.price = {};
+    if (minPrice) filter.price.$gte = Number(minPrice);
+    if (maxPrice) filter.price.$lte = Number(maxPrice);
+  }
+
+  const specFilterParams = Object.entries(req.query).filter(([key]) =>
+    key.startsWith("spec_"),
+  );
+  if (specFilterParams.length > 0) {
+    filter.$and = specFilterParams.map(([param, values]) => {
+      const specKey = param.replace("spec_", "");
+      const valueList = Array.isArray(values) ? values : [values];
+      return {
+        specifications: {
+          $elemMatch: { key: specKey, value: { $in: valueList } },
+        },
+      };
+    });
+  }
+
+  const sortConfig = {
+    newest: { field: "createdAt", order: -1 },
+    "price-asc": { field: "price", order: 1 },
+    "price-desc": { field: "price", order: -1 },
+  };
+  const { field: sortField, order: sortOrder } =
+    sortConfig[sort] || sortConfig.newest;
+
+  if (cursor) {
+    const cursorValue = sortField === "price" ? Number(cursor) : cursor;
+    const cursorCondition =
+      sortOrder === -1 ? { $lt: cursorValue } : { $gt: cursorValue };
+
+    if (sortField === "price") {
+      filter.price = { ...filter.price, ...cursorCondition };
+    } else {
+      filter[sortField] = cursorCondition;
+    }
+  }
+
+  const products = await Product.find(filter)
+    .populate("category", "name slug")
+    .sort({ [sortField]: sortOrder })
+    .limit(limit + 1);
+
+  const hasMore = products.length > limit;
+  const pageItems = hasMore ? products.slice(0, limit) : products;
+  const nextCursor = hasMore
+    ? pageItems[pageItems.length - 1][sortField]
+    : null;
+
+  res.status(200).json({
+    success: true,
+    message: "Products fetched successfully",
+    data: { products: pageItems, nextCursor, hasMore },
+  });
+};
+
+/*
  * GET /api/products/me
  * Paginated, searchable, filterable, sortable list of the
  * authenticated seller's own products.
@@ -164,10 +270,9 @@ const getMyProducts = async (req, res, next) => {
  * yet — add a check if this should be seller-only).
  */
 const getProductById = async (req, res, next) => {
-  const product = await Product.findById(req.params.id).populate(
-    "category",
-    "name",
-  );
+  const product = await Product.findById(req.params.id)
+    .populate("category", "name slug")
+    .populate("store", "storeName slug logo verificationStatus");
 
   if (!product) {
     throw new ApiError(404, "Product not found");
@@ -177,6 +282,76 @@ const getProductById = async (req, res, next) => {
     success: true,
     message: "Product fetched successfully",
     data: { product },
+  });
+};
+
+/*
+ * GET /api/products/spec-filters
+ * For a given category/subcategory, returns distinct values for every
+ * spec field marked filterable in that subcategory's template.
+ */
+const getSpecFilters = async (req, res, next) => {
+  const { categorySlug, subcategorySlug } = req.query;
+
+  if (!categorySlug || !subcategorySlug) {
+    return res.status(200).json({
+      success: true,
+      message: "Spec filters fetched successfully",
+      data: { specFilters: [] },
+    });
+  }
+
+  const category = await Category.findOne({ slug: categorySlug });
+  if (!category) {
+    return res.status(200).json({
+      success: true,
+      message: "Spec filters fetched successfully",
+      data: { specFilters: [] },
+    });
+  }
+
+  const subcategory = category.subcategories.find(
+    (s) => s.slug === subcategorySlug,
+  );
+  if (!subcategory) {
+    return res.status(200).json({
+      success: true,
+      message: "Spec filters fetched successfully",
+      data: { specFilters: [] },
+    });
+  }
+
+  const activeStores = await Store.find({
+    verificationStatus: "active",
+  }).select("_id");
+  const activeStoreIds = activeStores.map((s) => s._id);
+
+  const filterableFields = subcategory.specFields.filter((f) => f.filterable);
+
+  const products = await Product.find({
+    isActive: true,
+    store: { $in: activeStoreIds },
+    subcategoryId: subcategory._id,
+  }).select("specifications");
+
+  const specFilters = filterableFields.map((field) => {
+    const valueSet = new Set();
+    products.forEach((p) => {
+      const match = p.specifications.find((s) => s.key === field.key);
+      if (match) valueSet.add(match.value);
+    });
+
+    return {
+      key: field.key,
+      label: field.label,
+      values: Array.from(valueSet).sort(),
+    };
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Spec filters fetched successfully",
+    data: { specFilters },
   });
 };
 
@@ -297,11 +472,56 @@ const deactivateProduct = async (req, res, next) => {
   });
 };
 
+/*
+ * GET /api/products/trending
+ * Returns products ranked by total quantity ordered (excluding
+ * cancelled orders), across all time for now — could scope to a
+ * rolling window (e.g. last 30 days) once order volume justifies it.
+ */
+const getTrendingProducts = async (req, res, next) => {
+  const limit = parseInt(req.query.limit) || 10;
+
+  const topProductIds = await Order.aggregate([
+    { $match: { status: { $ne: "cancelled" } } },
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: "$items.product",
+        totalOrdered: { $sum: "$items.quantity" },
+      },
+    },
+    { $sort: { totalOrdered: -1 } },
+    { $limit: limit },
+  ]);
+
+  const productIds = topProductIds.map((p) => p._id);
+
+  const products = await Product.find({
+    _id: { $in: productIds },
+    isActive: true,
+  }).populate("category", "name slug");
+
+  // Preserve the aggregation's ranking order — Mongo's $in doesn't
+  // guarantee result order matches the input array order.
+  const orderedProducts = productIds
+    .map((id) => products.find((p) => p._id.toString() === id.toString()))
+    .filter(Boolean);
+
+  res.status(200).json({
+    success: true,
+    message: "Trending products fetched successfully",
+    data: { products: orderedProducts },
+  });
+};
+
 module.exports = {
   createProduct,
+  getProducts,
   getMyProducts,
   getProductById,
+  getSpecFilters,
   updateProduct,
   updateProductStock,
   deactivateProduct,
+  getTrendingProducts,
 };

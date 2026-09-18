@@ -12,8 +12,11 @@ const {
   getMyProducts,
   getProductById,
   updateProduct,
+  getSpecFilters,
   updateProductStock,
   deactivateProduct,
+  getProducts,
+  getTrendingProducts,
 } = require("../controllers/product.controller");
 
 router.post(
@@ -26,6 +29,9 @@ router.post(
 );
 
 router.get("/me", protect, requireVendor, getMyProducts);
+router.get("/spec-filters", getSpecFilters);
+router.get("/", getProducts);
+router.get("/trending", getTrendingProducts);
 router.get("/:id", getProductById); // public — buyers view product details too
 
 router.patch(

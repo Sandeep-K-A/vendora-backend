@@ -11,6 +11,7 @@ const {
   getMyStore,
   updateStore,
   deactivateStore,
+  getFeaturedStores,
 } = require("../controllers/store.controller");
 
 router.post(
@@ -23,6 +24,8 @@ router.post(
   handleMulterError,
   createStore,
 );
+
+router.get("/featured", getFeaturedStores);
 
 router.get("/me", protect, requireVendor, getMyStore);
 

@@ -4,6 +4,7 @@ const specFieldSchema = new mongoose.Schema({
   key: { type: String, required: true },
   label: { type: String, required: true },
   required: { type: Boolean, default: false },
+  filterable: { type: Boolean, default: false },
 });
 
 const subcategorySchema = new mongoose.Schema({

@@ -1,5 +1,6 @@
 const Store = require("../models/Store");
 const User = require("../models/User");
+const Product = require("../models/Product");
 const ApiError = require("../utils/ApiError");
 const { uploadImageToCloudinary } = require("../utils/uploadImage");
 
@@ -175,4 +176,60 @@ const deactivateStore = async (req, res, next) => {
   });
 };
 
-module.exports = { createStore, getMyStore, updateStore, deactivateStore };
+/*
+ * GET /api/stores/featured
+ * Returns up to 3 random, active/verified stores, each with their
+ * product count and newest product — for the homepage "verified
+ * sellers" section.
+ */
+const getFeaturedStores = async (req, res, next) => {
+  const stores = await Store.aggregate([
+    { $match: { verificationStatus: "active" } },
+    { $sample: { size: 3 } },
+  ]);
+
+  const enrichedStores = await Promise.all(
+    stores.map(async (store) => {
+      const [productCount, newestProduct] = await Promise.all([
+        Product.countDocuments({ store: store._id, isActive: true }),
+        Product.findOne({ store: store._id, isActive: true }).sort({
+          createdAt: -1,
+        }),
+      ]);
+
+      // Re-populate categories, since $sample/aggregate doesn't run
+      // Mongoose populate automatically
+      const populatedCategories = await Store.findById(store._id)
+        .select("categories")
+        .populate("categories", "name slug");
+
+      return {
+        _id: store._id,
+        storeName: store.storeName,
+        slug: store.slug,
+        logo: store.logo,
+        address: { city: store.address.city },
+        categoryMode: store.categoryMode,
+        categories: populatedCategories.categories,
+        productCount,
+        newestProduct,
+      };
+    }),
+  );
+
+  console.log(enrichedStores);
+
+  res.status(200).json({
+    success: true,
+    message: "Featured stores fetched successfully",
+    data: { stores: enrichedStores },
+  });
+};
+
+module.exports = {
+  createStore,
+  getMyStore,
+  updateStore,
+  deactivateStore,
+  getFeaturedStores,
+};
