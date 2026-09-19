@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
+const { required } = require("zod/mini");
 
 const storeSchema = new mongoose.Schema(
   {
@@ -61,6 +62,7 @@ const storeSchema = new mongoose.Schema(
     gstNumber: {
       type: String,
       trim: true,
+      required: true,
     },
 
     address: {

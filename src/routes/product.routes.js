@@ -11,6 +11,7 @@ const {
   createProduct,
   getMyProducts,
   getProductById,
+  getMyProductById,
   updateProduct,
   getSpecFilters,
   updateProductStock,
@@ -34,6 +35,7 @@ router.get("/", getProducts);
 router.get("/trending", getTrendingProducts);
 router.get("/:id", getProductById); // public — buyers view product details too
 
+router.get("/me/:id", protect, requireVendor, getMyProductById);
 router.patch(
   "/:id",
   protect,

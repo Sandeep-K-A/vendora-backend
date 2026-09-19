@@ -12,6 +12,8 @@ const {
   updateStore,
   deactivateStore,
   getFeaturedStores,
+  getStores,
+  getStoreBySlug,
 } = require("../controllers/store.controller");
 
 router.post(
@@ -24,6 +26,10 @@ router.post(
   handleMulterError,
   createStore,
 );
+
+router.get("/", getStores);
+
+router.get("/slug/:slug", getStoreBySlug);
 
 router.get("/featured", getFeaturedStores);
 

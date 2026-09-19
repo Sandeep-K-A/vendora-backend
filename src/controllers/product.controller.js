@@ -106,8 +106,15 @@ const createProduct = async (req, res, next) => {
  */
 const getProducts = async (req, res, next) => {
   const limit = parseInt(req.query.limit) || 12;
-  const { categorySlug, subcategorySlug, sort, minPrice, maxPrice, cursor } =
-    req.query;
+  const {
+    categorySlug,
+    subcategorySlug,
+    storeId,
+    sort,
+    minPrice,
+    maxPrice,
+    cursor,
+  } = req.query;
 
   const activeStores = await Store.find({
     verificationStatus: "active",
@@ -118,6 +125,10 @@ const getProducts = async (req, res, next) => {
     isActive: true,
     store: { $in: activeStoreIds },
   };
+
+  if (storeId) {
+    filter.store = storeId;
+  }
 
   if (categorySlug) {
     const category = await Category.findOne({
@@ -273,6 +284,38 @@ const getProductById = async (req, res, next) => {
   const product = await Product.findById(req.params.id)
     .populate("category", "name slug")
     .populate("store", "storeName slug logo verificationStatus");
+
+  if (!product || !product.isActive) {
+    throw new ApiError(404, "Product not found");
+  }
+
+  if (product.store.verificationStatus !== "active") {
+    throw new ApiError(404, "Product not found");
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Product fetched successfully",
+    data: { product },
+  });
+};
+
+/*
+ * GET /api/products/me/:id
+ * Seller's own product detail — ownership enforced, no store-status
+ * gate (a seller can view their own listing whether pending, active,
+ * suspended, or rejected).
+ */
+const getMyProductById = async (req, res, next) => {
+  const store = await Store.findOne({ owner: req.user._id });
+  if (!store) {
+    throw new ApiError(404, "Store not found");
+  }
+
+  const product = await Product.findOne({
+    _id: req.params.id,
+    store: store._id,
+  }).populate("category", "name slug");
 
   if (!product) {
     throw new ApiError(404, "Product not found");
@@ -519,6 +562,7 @@ module.exports = {
   getProducts,
   getMyProducts,
   getProductById,
+  getMyProductById,
   getSpecFilters,
   updateProduct,
   updateProductStock,

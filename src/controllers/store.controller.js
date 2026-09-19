@@ -111,27 +111,29 @@ const getMyStore = async (req, res, next) => {
 };
 
 const updateStore = async (req, res, next) => {
-  const store = await store.findOne({ owner: req.user._id });
+  const store = await Store.findOne({ owner: req.user._id });
 
   if (!store) {
-    throw new ApiError(404, "You don't have a store yet");
+    throw new ApiError(404, "Store not found");
   }
 
   const {
+    storeName,
     storeDescription,
     categoryMode,
     categories,
     phone,
-    gstNumber,
     address,
   } = req.body;
 
+  if (storeName !== undefined) store.storeName = storeName;
   if (storeDescription !== undefined) store.storeDescription = storeDescription;
   if (categoryMode !== undefined) store.categoryMode = categoryMode;
-  if (categories !== undefined) store.categories = categories;
+  if (categories !== undefined) store.categories = JSON.parse(categories);
   if (phone !== undefined) store.phone = phone;
-  if (gstNumber !== undefined) store.gstNumber = gstNumber;
-  if (address !== undefined) store.address = address;
+  if (address !== undefined) store.address = JSON.parse(address);
+
+  // logo/banner handled separately below, since they arrive as files
 
   if (req.files?.logo) {
     store.logo = await uploadImageToCloudinary(
@@ -146,11 +148,14 @@ const updateStore = async (req, res, next) => {
     );
   }
 
+  // Any successful edit requires re-approval
+  store.verificationStatus = "pending";
+
   await store.save();
 
   res.status(200).json({
     success: true,
-    message: "Store updated successfully",
+    message: "Store updated. Your changes are pending review.",
     data: { store },
   });
 };
@@ -226,10 +231,126 @@ const getFeaturedStores = async (req, res, next) => {
   });
 };
 
+const getStores = async (req, res, next) => {
+  const limit = parseInt(req.query.limit) || 12;
+
+  const { search, category, sort, cursor } = req.query;
+
+  const filter = { verificationStatus: "active" };
+
+  if (search) {
+    filter.storeName = { $regex: search, $options: "i" };
+  }
+
+  if (category) {
+    filter.categories = category;
+  }
+
+  const sortConfig = {
+    newest: { field: "createdAt", order: -1 },
+  };
+  const { field: sortField, order: sortOrder } =
+    sortConfig[sort] || sortConfig.newest;
+
+  if (cursor) {
+    filter[sortField] = sortOrder === -1 ? { $lt: cursor } : { $gt: cursor };
+  }
+
+  let stores = await Store.find(filter)
+    .sort({ [sortField]: sortOrder })
+    .limit(limit + 1);
+
+  const hasMore = stores.length > limit;
+  const pageItems = hasMore ? stores.slice(0, limit) : stores;
+  const nextCursor = hasMore
+    ? pageItems[pageItems.length - 1][sortField]
+    : null;
+
+  const enrichedStores = await Promise.all(
+    pageItems.map(async (store) => {
+      const [productCount, newestProduct, populatedCategories] =
+        await Promise.all([
+          Product.countDocuments({ store: store._id, isActive: true }),
+          Product.findOne({ store: store._id, isActive: true }).sort({
+            createdAt: -1,
+          }),
+          Store.findById(store._id)
+            .select("categories")
+            .populate("categories", "name slug"),
+        ]);
+
+      return {
+        _id: store._id,
+        storeName: store.storeName,
+        slug: store.slug,
+        logo: store.logo,
+        address: { city: store.address.city },
+        categoryMode: store.categoryMode,
+        categories: populatedCategories?.categories ?? [],
+        productCount,
+        newestProduct,
+      };
+    }),
+  );
+
+  const finalStores =
+    sort === "mostProducts"
+      ? enrichedStores.sort((a, b) => b.productCount - a.productCount)
+      : enrichedStores;
+
+  res.status(200).json({
+    success: true,
+    message: "Stores fetched successfully",
+    data: {
+      stores: finalStores,
+      nextCursor,
+      hasMore,
+    },
+  });
+};
+
+const getStoreBySlug = async (req, res, next) => {
+  const store = await Store.findOne({
+    slug: req.params.slug,
+    verificationStatus: "active",
+  }).populate("categories", "name slug");
+
+  if (!store) {
+    throw new ApiError(404, "Store not found");
+  }
+
+  const productCount = await Product.countDocuments({
+    store: store._id,
+    isActive: true,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Store fetched successfully",
+    data: {
+      store: {
+        _id: store._id,
+        storeName: store.storeName,
+        storeDescription: store.storeDescription,
+        slug: store.slug,
+        logo: store.logo,
+        banner: store.banner,
+        address: { city: store.address.city, state: store.address.state },
+        categoryMode: store.categoryMode,
+        categories: store.categories,
+        productCount,
+        createdAt: store.createdAt,
+      },
+    },
+  });
+};
+
 module.exports = {
   createStore,
+  getStores,
   getMyStore,
   updateStore,
   deactivateStore,
   getFeaturedStores,
+  getStoreBySlug,
 };
