@@ -18,6 +18,7 @@ const {
   deactivateProduct,
   getProducts,
   getTrendingProducts,
+  getHeroData,
 } = require("../controllers/product.controller");
 
 router.post(
@@ -29,6 +30,7 @@ router.post(
   createProduct,
 );
 
+router.get("/hero", getHeroData);
 router.get("/me", protect, requireVendor, getMyProducts);
 router.get("/spec-filters", getSpecFilters);
 router.get("/", getProducts);
@@ -37,10 +39,10 @@ router.get("/:id", getProductById); // public — buyers view product details to
 
 router.get("/me/:id", protect, requireVendor, getMyProductById);
 router.patch(
-  "/:id",
+  "/me/:id",
   protect,
   requireVendor,
-  upload.fields([{ name: "images", maxCount: 8 }]),
+  upload.fields([{ name: "images", maxCount: 4 }]),
   handleMulterError,
   updateProduct,
 );

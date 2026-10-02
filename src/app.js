@@ -13,6 +13,8 @@ const cartRoutes = require("./routes/cart.routes");
 const addressRoutes = require("./routes/address.routes");
 const checkoutRoutes = require("./routes/checkout.routes");
 const orderRoutes = require("./routes/order.routes");
+const searchRoutes = require("./routes/search.routes");
+const adminRoutes = require("./routes/admin.routes");
 
 const app = express();
 
@@ -47,6 +49,8 @@ app.use("/api/cart", cartRoutes);
 app.use("/api/addresses", addressRoutes);
 app.use("/api/checkout", checkoutRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/search", searchRoutes);
+app.use("/api/admin", adminRoutes);
 
 // --- 404 handler ---
 app.use(notFound);

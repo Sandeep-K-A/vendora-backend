@@ -20,7 +20,18 @@ const subcategorySchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
   },
-  specFields: [specFieldSchema],
+  specFields: {
+    type: [specFieldSchema],
+    validate: {
+      validator: function (specFields) {
+        if (specFields.length !== 4) return false;
+        const filterableCount = specFields.filter((f) => f.filterable).length;
+        return filterableCount === 2;
+      },
+      message:
+        "A subcategory must have exactly 4 spec fields, with exactly 2 marked filterable.",
+    },
+  },
 });
 
 const categorySchema = new mongoose.Schema(
@@ -38,11 +49,6 @@ const categorySchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-    },
-    description: {
-      type: String,
-      trim: true,
-      maxlength: 500,
     },
     image: {
       type: String,

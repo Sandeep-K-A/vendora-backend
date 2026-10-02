@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const ApiError = require("../utils/ApiError");
 const Product = require("../models/Product");
+const Store = require("../models/Store");
 
 const getMyOrders = async (req, res, next) => {
   const page = parseInt(req.query.page) || 1;
@@ -108,4 +109,134 @@ const cancelOrder = async (req, res, next) => {
   });
 };
 
-module.exports = { getMyOrders, getOrderById, cancelOrder };
+/*
+ * GET /api/orders/seller/me
+ * Seller's own store's orders — flat list, page-based pagination,
+ * no checkout-grouping (that's a buyer-side concern only).
+ */
+const getMySellerOrders = async (req, res, next) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const { status, search, sort } = req.query;
+
+  const store = await Store.findOne({ owner: req.user._id });
+  if (!store) {
+    throw new ApiError(404, "Store not found");
+  }
+
+  const filter = { store: store._id };
+
+  if (status && status !== "all") {
+    filter.status =
+      status === "needsAction" ? { $in: ["placed", "confirmed"] } : status;
+  }
+
+  if (search) {
+    // Order IDs are ObjectIds — match if the search term is a valid
+    // hex fragment; a full regex match against _id's string form.
+    filter.$expr = {
+      $regexMatch: {
+        input: { $toString: "$_id" },
+        regex: search,
+        options: "i",
+      },
+    };
+  }
+
+  const sortOrder = sort === "oldest" ? 1 : -1;
+
+  const [orders, totalCount] = await Promise.all([
+    Order.find(filter)
+      .sort({ createdAt: sortOrder })
+      .skip((page - 1) * limit)
+      .limit(limit),
+    Order.countDocuments(filter),
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: "Orders fetched successfully",
+    data: {
+      orders,
+      page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount,
+    },
+  });
+};
+
+/*
+ * PATCH /api/orders/seller/:id/status
+ * Seller-initiated status transition — manual, no automation.
+ * Only forward transitions along the normal lifecycle are allowed;
+ * a seller can't skip steps or move an order backward.
+ */
+const ALLOWED_TRANSITIONS = {
+  confirmed: ["shipped"],
+  shipped: ["delivered"],
+};
+
+const updateOrderStatus = async (req, res, next) => {
+  const { status: nextStatus } = req.body;
+
+  const store = await Store.findOne({ owner: req.user._id });
+  if (!store) {
+    throw new ApiError(404, "Store not found");
+  }
+
+  const order = await Order.findOne({ _id: req.params.id, store: store._id });
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
+
+  const allowedNext = ALLOWED_TRANSITIONS[order.status] ?? [];
+  if (!allowedNext.includes(nextStatus)) {
+    throw new ApiError(
+      409,
+      `Cannot move an order from "${order.status}" to "${nextStatus}".`,
+    );
+  }
+
+  order.status = nextStatus;
+  await order.save();
+
+  res.status(200).json({
+    success: true,
+    message: `Order marked as ${nextStatus}`,
+    data: { order },
+  });
+};
+/*
+ * GET /api/order/seller/:id
+ * Single order detail, scoped to the seller's own store.
+ */
+const getMySellerOrderById = async (req, res, next) => {
+  const store = await Store.findOne({ owner: req.user._id });
+  if (!store) {
+    throw new ApiError(404, "Store not found");
+  }
+
+  const order = await Order.findOne({
+    _id: req.params.id,
+    store: store._id,
+  }).populate("checkout", "stripePaymentIntentId paymentStatus");
+
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Order fetched successfully",
+    data: { order },
+  });
+};
+
+module.exports = {
+  getMyOrders,
+  getOrderById,
+  cancelOrder,
+  getMySellerOrders,
+  updateOrderStatus,
+  getMySellerOrderById,
+};

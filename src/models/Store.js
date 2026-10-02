@@ -91,7 +91,7 @@ const storeSchema = new mongoose.Schema(
 
     verificationStatus: {
       type: String,
-      enum: ["pending", "active", "suspended", "rejected"],
+      enum: ["pending", "active", "suspended", "rejected", "disabled"],
       default: "pending",
     },
   },

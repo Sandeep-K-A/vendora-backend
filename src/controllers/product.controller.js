@@ -438,7 +438,36 @@ const updateProduct = async (req, res, next) => {
     }
   }
 
-  if (req.files?.images) {
+  // Images: the frontend sends `existingImages` — the URLs it wants to
+  // KEEP, in slot order — plus any new files under `images`. The final
+  // array is existing (kept) + newly uploaded, preserving slot order.
+  if (req.body.existingImages !== undefined) {
+    let existingImages;
+    try {
+      existingImages = JSON.parse(req.body.existingImages);
+    } catch (err) {
+      throw new ApiError(400, "Invalid existingImages format");
+    }
+
+    const newImages = [];
+    if (req.files?.images) {
+      for (const file of req.files.images) {
+        const url = await uploadImageToCloudinary(
+          file.buffer,
+          "vendora/product-images",
+        );
+        newImages.push(url);
+      }
+    }
+
+    product.images = [...existingImages, ...newImages];
+
+    if (product.images.length === 0) {
+      throw new ApiError(400, "A product must have at least one image");
+    }
+  } else if (req.files?.images) {
+    // Backward-compatible path: no existingImages sent, just append
+    // (matches the original behavior for any other caller of this endpoint)
     const newImages = [];
     for (const file of req.files.images) {
       const url = await uploadImageToCloudinary(
@@ -557,6 +586,82 @@ const getTrendingProducts = async (req, res, next) => {
   });
 };
 
+const getHeroData = async (req, res, next) => {
+  const categories = await Category.find({ isActive: true });
+
+  const entries = [];
+  const topOrdered = [];
+
+  for (const category of categories) {
+    const newestProduct = await Product.findOne({
+      category: category._id,
+      isActive: true,
+    }).sort({ createdAt: -1 });
+
+    if (newestProduct) {
+      entries.push({
+        category: {
+          _id: category._id,
+          name: category.name,
+          slug: category.slug,
+        },
+        product: newestProduct,
+      });
+    }
+
+    const topOrderedAgg = await Order.aggregate([
+      { $match: { status: { $ne: "cancelled" } } },
+      { $unwind: "$items" },
+      {
+        $lookup: {
+          from: "products",
+          localField: "items.product",
+          foreignField: "_id",
+          as: "productDoc",
+        },
+      },
+      { $unwind: "$productDoc" },
+      {
+        $match: {
+          "productDoc.category": category._id,
+          "productDoc.isActive": true,
+        },
+      },
+      {
+        $group: {
+          _id: "$items.product",
+          totalOrdered: { $sum: "$items.quantity" },
+          product: { $first: "$productDoc" },
+        },
+      },
+      { $sort: { totalOrdered: -1 } },
+      { $limit: 1 },
+    ]);
+
+    if (topOrderedAgg.length > 0) {
+      topOrdered.push({
+        category: {
+          _id: category._id,
+          name: category.name,
+          slug: category.slug,
+        },
+        product: topOrderedAgg[0].product,
+        orderCount: topOrderedAgg[0].totalOrdered,
+      });
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Hero data fetched successfully",
+    data: {
+      spotlight: entries,
+      newest: entries,
+      topOrdered,
+    },
+  });
+};
+
 module.exports = {
   createProduct,
   getProducts,
@@ -568,4 +673,5 @@ module.exports = {
   updateProductStock,
   deactivateProduct,
   getTrendingProducts,
+  getHeroData,
 };

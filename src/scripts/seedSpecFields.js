@@ -11,13 +11,7 @@ const specFieldsBySlug = {
     {
       key: "batteryCapacity",
       label: "Battery Capacity",
-      required: false,
-      filterable: false,
-    },
-    {
-      key: "screenSize",
-      label: "Screen Size",
-      required: false,
+      required: true,
       filterable: false,
     },
   ],
@@ -28,13 +22,7 @@ const specFieldsBySlug = {
     {
       key: "screenSize",
       label: "Screen Size",
-      required: false,
-      filterable: false,
-    },
-    {
-      key: "batteryLife",
-      label: "Battery Life",
-      required: false,
+      required: true,
       filterable: false,
     },
   ],
@@ -43,9 +31,8 @@ const specFieldsBySlug = {
   football: [
     { key: "size", label: "Size", required: true, filterable: true },
     { key: "material", label: "Material", required: true, filterable: true },
-    { key: "weight", label: "Weight", required: false, filterable: false },
-    { key: "brand", label: "Brand", required: false, filterable: false },
-    { key: "type", label: "Type", required: false, filterable: false },
+    { key: "weight", label: "Weight", required: true, filterable: false },
+    { key: "brand", label: "Brand", required: true, filterable: false },
   ],
   fitness: [
     {
@@ -54,76 +41,66 @@ const specFieldsBySlug = {
       required: true,
       filterable: true,
     },
-    { key: "material", label: "Material", required: false, filterable: false },
+    { key: "brand", label: "Brand", required: true, filterable: true },
+    { key: "material", label: "Material", required: true, filterable: false },
     {
       key: "weightCapacity",
       label: "Weight Capacity",
-      required: false,
+      required: true,
       filterable: false,
     },
-    { key: "brand", label: "Brand", required: false, filterable: true },
   ],
 
   // Books
   programming: [
     { key: "author", label: "Author", required: true, filterable: true },
-    { key: "language", label: "Language", required: false, filterable: true },
+    { key: "language", label: "Language", required: true, filterable: true },
     { key: "isbn", label: "ISBN", required: true, filterable: false },
-    { key: "pages", label: "Pages", required: false, filterable: false },
-    {
-      key: "publisher",
-      label: "Publisher",
-      required: false,
-      filterable: false,
-    },
+    { key: "pages", label: "Pages", required: true, filterable: false },
   ],
   fiction: [
     { key: "author", label: "Author", required: true, filterable: true },
-    { key: "language", label: "Language", required: false, filterable: true },
+    { key: "language", label: "Language", required: true, filterable: true },
     { key: "isbn", label: "ISBN", required: true, filterable: false },
-    { key: "pages", label: "Pages", required: false, filterable: false },
-    {
-      key: "publisher",
-      label: "Publisher",
-      required: false,
-      filterable: false,
-    },
+    { key: "pages", label: "Pages", required: true, filterable: false },
   ],
 
   // Fashion
   men: [
     { key: "size", label: "Size", required: true, filterable: true },
-    { key: "color", label: "Color", required: false, filterable: true },
-    { key: "material", label: "Material", required: false, filterable: false },
-    { key: "brand", label: "Brand", required: false, filterable: false },
+    { key: "color", label: "Color", required: true, filterable: true },
+    { key: "material", label: "Material", required: true, filterable: false },
+    { key: "brand", label: "Brand", required: true, filterable: false },
   ],
   women: [
     { key: "size", label: "Size", required: true, filterable: true },
-    { key: "color", label: "Color", required: false, filterable: true },
-    { key: "material", label: "Material", required: false, filterable: false },
-    { key: "brand", label: "Brand", required: false, filterable: false },
+    { key: "color", label: "Color", required: true, filterable: true },
+    { key: "material", label: "Material", required: true, filterable: false },
+    { key: "brand", label: "Brand", required: true, filterable: false },
   ],
 
   // Home & Kitchen
   decor: [
     { key: "material", label: "Material", required: true, filterable: true },
-    { key: "color", label: "Color", required: false, filterable: true },
+    { key: "color", label: "Color", required: true, filterable: true },
     {
       key: "dimensions",
       label: "Dimensions",
-      required: false,
+      required: true,
       filterable: false,
     },
+    { key: "style", label: "Style", required: true, filterable: false },
   ],
   "kitchen-dining": [
     { key: "material", label: "Material", required: true, filterable: true },
     {
       key: "dishwasherSafe",
       label: "Dishwasher Safe",
-      required: false,
+      required: true,
       filterable: true,
     },
-    { key: "capacity", label: "Capacity", required: false, filterable: false },
+    { key: "capacity", label: "Capacity", required: true, filterable: false },
+    { key: "setSize", label: "Set Size", required: true, filterable: false },
   ],
 };
 

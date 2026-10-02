@@ -1,5 +1,6 @@
 const Store = require("../models/Store");
 const User = require("../models/User");
+const Order = require("../models/Order");
 const Product = require("../models/Product");
 const ApiError = require("../utils/ApiError");
 const { uploadImageToCloudinary } = require("../utils/uploadImage");
@@ -345,6 +346,124 @@ const getStoreBySlug = async (req, res, next) => {
   });
 };
 
+const RANGE_CONFIG = {
+  "7d": { days: 7, bucket: "day" },
+  "30d": { days: 30, bucket: "day" },
+  "90d": { days: 90, bucket: "week" },
+  all: { days: null, bucket: "month" },
+};
+
+// Maps each bucket granularity to how the truncated date should be
+// displayed on the chart's x-axis.
+const DATE_FORMAT_BY_BUCKET = {
+  day: "%b %d", // "Sep 14"
+  week: "%b %d", // "Sep 15" (the Monday starting that week)
+  month: "%b %Y", // "Sep 2026"
+};
+
+const getMyStoreAnalytics = async (req, res, next) => {
+  const store = await Store.findOne({ owner: req.user._id });
+  if (!store) {
+    throw new ApiError(404, "Store not found");
+  }
+
+  const range = RANGE_CONFIG[req.query.range] ? req.query.range : "30d";
+  const { days, bucket } = RANGE_CONFIG[range];
+  const dateFormat = DATE_FORMAT_BY_BUCKET[bucket];
+
+  const matchStage = {
+    store: store._id,
+    status: { $ne: "cancelled" },
+  };
+
+  if (days) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    matchStage.createdAt = { $gte: since };
+  }
+
+  // Truncate each order's createdAt to the bucket's granularity, then
+  // format that truncated date for display — this replaces the raw
+  // ISO week/month strings with actual, readable dates.
+  const truncatedDateExpr =
+    bucket === "day"
+      ? "$createdAt"
+      : { $dateTrunc: { date: "$createdAt", unit: bucket } };
+
+  const timeSeries = await Order.aggregate([
+    { $match: matchStage },
+    {
+      $group: {
+        _id: { $dateToString: { format: dateFormat, date: truncatedDateExpr } },
+        // Keep the actual truncated date too, for correct chronological
+        // sorting — string-sorting "Sep 5" vs "Sep 14" would sort wrong
+        // lexicographically (e.g. "Sep 14" before "Sep 5").
+        sortDate: { $first: truncatedDateExpr },
+        revenue: { $sum: "$subtotal" },
+        orderCount: { $sum: 1 },
+      },
+    },
+    { $sort: { sortDate: 1 } },
+  ]);
+
+  const [summary] = await Order.aggregate([
+    { $match: matchStage },
+    {
+      $group: {
+        _id: null,
+        totalRevenue: { $sum: "$subtotal" },
+        totalOrders: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const totalRevenue = summary?.totalRevenue ?? 0;
+  const totalOrders = summary?.totalOrders ?? 0;
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  const activeProductCount = await Product.countDocuments({
+    store: store._id,
+    isActive: true,
+  });
+
+  const topProducts = await Order.aggregate([
+    { $match: matchStage },
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: "$items.product",
+        name: { $first: "$items.name" },
+        image: { $first: "$items.image" },
+        unitsSold: { $sum: "$items.quantity" },
+        revenue: {
+          $sum: { $multiply: ["$items.priceAtPurchase", "$items.quantity"] },
+        },
+      },
+    },
+    { $sort: { unitsSold: -1 } },
+    { $limit: 5 },
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: "Analytics fetched successfully",
+    data: {
+      range,
+      summary: {
+        totalRevenue,
+        totalOrders,
+        avgOrderValue,
+        activeProductCount,
+      },
+      timeSeries: timeSeries.map((point) => ({
+        date: point._id,
+        revenue: point.revenue,
+        orderCount: point.orderCount,
+      })),
+      topProducts,
+    },
+  });
+};
 module.exports = {
   createStore,
   getStores,
@@ -353,4 +472,5 @@ module.exports = {
   deactivateStore,
   getFeaturedStores,
   getStoreBySlug,
+  getMyStoreAnalytics,
 };

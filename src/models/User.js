@@ -54,7 +54,7 @@ const userSchema = new mongoose.Schema(
     },
     storeId: {
       type: mongoose.Schema.Types.ObjectId,
-      // ref: Store,
+      ref: "Store",
       default: null,
     },
 

@@ -14,6 +14,7 @@ const {
   getFeaturedStores,
   getStores,
   getStoreBySlug,
+  getMyStoreAnalytics,
 } = require("../controllers/store.controller");
 
 router.post(
@@ -34,6 +35,8 @@ router.get("/slug/:slug", getStoreBySlug);
 router.get("/featured", getFeaturedStores);
 
 router.get("/me", protect, requireVendor, getMyStore);
+
+router.get("/me/analytics", protect, requireVendor, getMyStoreAnalytics);
 
 router.patch(
   "/me",
